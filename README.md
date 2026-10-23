@@ -91,6 +91,31 @@ python tl2c.py op.py \
          in_dtype=float32 out_dtype=float32
 ```
 
+## Standalone executable (no Python required to run)
+
+`build.sh` uses PyInstaller to bundle `tl2c.py` together with the TileLang
+runtime (its own TVM, native libs, and codegen headers) into a single
+`dist/tl2c/` directory. The resulting binary runs on a machine that has **no
+Python and no tilelang** installed.
+
+```sh
+./build.sh                       # -> dist/tl2c/tl2c  (self-test included)
+./dist/tl2c/tl2c op.py -o out.cu --args M=1024 N=1024 block_M=32 block_N=32 \
+    threads=128 in_dtype=float32 out_dtype=float32
+```
+
+Notes on the bundle:
+
+- **onedir, not onefile**: TileLang/TVm load native `.so` files at fixed
+  package-relative paths during `import tilelang`; a self-extracting onefile
+  would race that. The output is a `dist/tl2c/` folder, move it as a unit.
+- **torch is not bundled**: `torch_stub.py` (installed by the runtime hook
+  `_tl2c_hook.py` before the entry script) satisfies TileLang's unconditional
+  `import torch`, so the ~700MB torch wheel stays out of the bundle. The
+  source-lowering path this tool uses never touches a real tensor.
+- Output is byte-identical to running `python tl2c.py` in a real env (the
+  `build.sh` self-test emits an operator and checks it).
+
 ## Notes
 
 - Only source is emitted; compile the output with your own `nvcc` / host C++ / Zig / Rust toolchain.
